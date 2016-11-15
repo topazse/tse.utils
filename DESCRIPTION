@@ -1,0 +1,10 @@
+Package: tse.utils
+Type: Package
+Title: Funciones de Utilidades
+Version: 0.1.0
+Author: Eduardo Flores
+Maintainer: Eduardo Flores <efl@topaz.mx>
+Description: Funciones utiles para datos en Topaz Soluciones Educativas
+License: CCO
+Encoding: UTF-8
+LazyData: true
