@@ -1,0 +1,50 @@
+#' Eliminar outliers
+#'
+#' Elimina outliers de columna al porcentaje parametrizado
+#'
+#' @param .data dataset a usar
+#' @param por columna (desnuda) por la cual eliminar outliers
+#' @param p porcentaje (en decimal) a eliminar de registros
+#' @param tipo "ambos", "abajo" o "arriba" depende el caso
+#' @examples
+#'  df <- data.frame("columna1" = c(1,2,3,4,5,6,1,2,3,4,5,6),
+#'                   "columna2" = c(84,102,99,103,101,109,
+#'                                  116,121,122,119,131,222))
+#' df_sin <- t_eoutliers(df, columna2)
+#' @export
+t.eoutliers <- function(.data, por, p = 0.01, tipo = "ambos"){
+  .data <- as.data.frame(.data)
+  e <- length(.data[,1])
+
+  arguments <- as.list(match.call())
+  col <- eval(arguments$por, .data)
+  d <- with(.data, col)
+
+  #limites
+  lim_s <- 1-p
+  lim_i <- p
+  #quantiles
+  qs <- quantile(d, lim_s)
+  qi <- quantile(d, lim_i)
+  #filtrar
+  if(tipo=="ambos"){
+    newd <- .data[with(.data, col)>qi & with(.data, col)<qs,]
+  }else
+    if(tipo=="abajo"){
+      newd <- .data[with(.data, col)>qi,]
+    }else{
+      if(tipo=="arriba"){
+        newd <- .data[with(.data, col)<qs,]
+      }else{
+        stop("No reconocido... Poner arriba, abajo o ambos en tipo.")
+      }
+    }
+
+  f <- length(newd[,1])
+  msg <- paste0("Eliminando... ", ifelse(e-f>10000,
+                                         paste0(round((e-f)/1000, digits = 0), "k"),
+                                         e-f),
+                " renglones (", round((e-f)/e*100, digits = 2), "%)")
+  print(msg)
+  return(newd)
+}
