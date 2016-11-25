@@ -10,4 +10,5 @@
   library(magrittr)
   # library(xlsx)
   library(foreign)
+  library(memisc)
 }

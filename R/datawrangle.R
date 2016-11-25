@@ -12,7 +12,7 @@
 #'                                  116,121,122,119,131,222))
 #' df_sin <- t_eoutliers(df, columna2)
 #' @export
-t.eoutliers <- function(.data, por, p = 0.01, tipo = "ambos"){
+t_eoutliers <- function(.data, por, p = 0.01, tipo = "ambos"){
   .data <- as.data.frame(.data)
   e <- length(.data[,1])
 
@@ -47,4 +47,31 @@ t.eoutliers <- function(.data, por, p = 0.01, tipo = "ambos"){
                 " renglones (", round((e-f)/e*100, digits = 2), "%)")
   print(msg)
   return(newd)
+}
+#' Retorna strings de conteo
+#'
+#' Al ingresar un numero, rendondea a miles o millones, de acuerdo al dato. Usado en prints para resumir informacion.
+#'
+#' @param n numero
+#' @param aprox Si TRUE redondea, si FALSE pone todos los digitos.
+#' @export
+t_printnum <- function(n, aprox = TRUE){
+  if(n<1000){
+    nn <- n
+  }else{
+    if(n<999999){
+      if(aprox){
+        nn <- paste0("aprox. ", round(n/1000, digits = 1)," mil")
+      }else{
+        nn <- paste0(n/1000, " mil")
+      }
+      }else{
+      if(aprox){
+        nn <- paste0("aprox. ", round(n/1000000, digits = 0)," millones")
+      }else{
+        nn <- paste0(n/1000000, " millones")
+      }
+    }
+    }
+  nn
 }
