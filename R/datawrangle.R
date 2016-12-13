@@ -75,3 +75,23 @@ t_printnum <- function(n, aprox = TRUE){
     }
   nn
 }
+#' Metodo para convertir nan's de data.frames a ceros
+#'
+#' @param x data.frame
+#' @export
+is.nan.data.frame <- function(x)
+  do.call(cbind, lapply(x, is.nan))
+#' Metodo para resumir porcentajes
+#'
+#' @param v vector de numeros
+#' @param base100 si TRUE cincuenta porciento es 50. Si FALSE multiplica por 100.
+#' @export
+pcts <- function(v, base100 = TRUE){
+  if(base100){
+    v <- round(v, digits = 1)
+  }else{
+    v <- round(v*100, digits = 1)
+  }
+  v <- paste0(v,"%")
+  v
+}
