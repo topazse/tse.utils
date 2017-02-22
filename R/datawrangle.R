@@ -102,6 +102,9 @@ pcts <- function(v, base100 = TRUE){
 #' @param col numero de columa o nombre de columna
 #' @export
 t_lu <- function(.data, col = 1, all = FALSE){
+
+  .data <- as.data.frame(.data)
+
   if(all){
     # count all cols
     n <- length(colnames(.data))
@@ -112,7 +115,6 @@ t_lu <- function(.data, col = 1, all = FALSE){
     return(n)
 
   }else{
-  .data <- as.data.frame(.data)
   r <- .data[, col]
   n <- length(unique(r))
   return(n)
