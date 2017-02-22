@@ -101,9 +101,20 @@ pcts <- function(v, base100 = TRUE){
 #' @param .data data.frame
 #' @param col numero de columa o nombre de columna
 #' @export
-t_lu <- function(.data, col = 1){
+t_lu <- function(.data, col = 1, all = FALSE){
+  if(all){
+    # count all cols
+    n <- length(colnames(.data))
+    for(i in 1:n){
+      r <- .data[,i]
+      n[i] <- length(unique(r))
+    }
+    return(n)
+
+  }else{
   .data <- as.data.frame(.data)
-  r <- .data[col, ]
+  r <- .data[, col]
   n <- length(unique(r))
-  n
+  return(n)
+  }
 }

@@ -4,7 +4,7 @@
 \alias{t_lu}
 \title{Funcion para decirme rapidamente unicos por columna}
 \usage{
-t_lu(.data, col = 1)
+t_lu(.data, col = 1, all = FALSE)
 }
 \arguments{
 \item{.data}{data.frame}
