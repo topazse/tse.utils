@@ -95,3 +95,15 @@ pcts <- function(v, base100 = TRUE){
   v <- paste0(v,"%")
   v
 }
+
+#' Funcion para decirme rapidamente unicos por columna
+#'
+#' @param .data data.frame
+#' @param col numero de columa o nombre de columna
+#' @export
+t_lu <- function(.data, col = 1){
+  .data <- as.data.frame(.data)
+  r <- .data[col, ]
+  n <- length(unique(r))
+  n
+}
