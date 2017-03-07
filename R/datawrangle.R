@@ -100,8 +100,10 @@ pcts <- function(v, base100 = TRUE){
 #'
 #' @param .data data.frame
 #' @param col numero de columa o nombre de columna
+#' @param all si TRUE da de todas las columnas. Lo mismo que dejar col en NULL.
+#' @param names si TRUE, me genera un data.frame con nombres y unicos, no un vector.
 #' @export
-t_lu <- function(.data, col = NULL, all = FALSE){
+t_lu <- function(.data, col = NULL, all = FALSE, names = TRUE){
 
   .data <- as.data.frame(.data)
 
@@ -112,15 +114,28 @@ t_lu <- function(.data, col = NULL, all = FALSE){
   if(all){
     # count all cols
     n <- length(colnames(.data))
+    p <- NULL
     for(i in 1:n){
       r <- .data[,i]
       n[i] <- length(unique(r))
+      p[i] <- colnames(.data)[i]
     }
-    return(n)
-
+      if(names){
+        d <- data.frame("COLUMNA" = p, 
+                        "UNICOS" = n)
+        return(d)
+        }else{
+          return(n)
+        }
   }else{
   r <- .data[, col]
   n <- length(unique(r))
-  return(n)
+    
+    if(names){
+      d <- data.frame("COLUMNA" = col, "UNICOS" = n)
+      return(d)
+      }else{
+      return(n)
+      }
   }
 }
