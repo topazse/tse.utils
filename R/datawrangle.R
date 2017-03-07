@@ -101,7 +101,7 @@ pcts <- function(v, base100 = TRUE){
 #' @param .data data.frame
 #' @param col numero de columa o nombre de columna
 #' @export
-t_lu <- function(.data, col = 1, all = FALSE){
+t_lu <- function(.data, col, all = FALSE){
 
   .data <- as.data.frame(.data)
 
