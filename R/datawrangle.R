@@ -105,6 +105,10 @@ t_lu <- function(.data, col = 1, all = FALSE){
 
   .data <- as.data.frame(.data)
 
+  if(is.null(col)){
+    all <- TRUE
+    }
+  
   if(all){
     # count all cols
     n <- length(colnames(.data))
