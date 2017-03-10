@@ -139,3 +139,36 @@ t_lu <- function(.data, col = NULL, all = FALSE, names = TRUE){
       }
   }
 }
+#' Hacer llavegeo
+#'
+#' Toma ids de estado y municipio (en numeros o como esten) y regresa llavegeo usada en SQL.
+#' @param estado estado en formato 00 o 0
+#' @param municipio en formato 000, 00 o 0
+#' @export
+t_llavegeo <- function(estado, municipio){
+  if(nchar(estado) == 1){
+    estado <- paste0("0", estado)
+  }else{ 
+    if(nchar(estado) == 2){
+      # nada
+    }else{
+      stop("Estado tiene cero o mas de 2 letras/numeros")
+    }
+    }
+  if(nchar(municipio) == 3){
+    # nada
+  }else{
+    if(nchar(municipio) == 2){
+      municipio <- paste0("0", municipio)
+    }else{
+      if(nchar(municipio) == 1){
+        municipio <- paste0("00", municipio)
+      }else{
+        stop("Municipio tiene cero o mas de 4 letras/numeros")
+      }
+    }
+  }
+  
+  llave <- paste0(estado, "-", municipio)
+  return(llave)
+}
