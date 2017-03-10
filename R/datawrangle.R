@@ -146,6 +146,9 @@ t_lu <- function(.data, col = NULL, all = FALSE, names = TRUE){
 #' @param municipio en formato 000, 00 o 0
 #' @export
 t_llavegeo <- function(estado, municipio){
+  estado <- as.character(estado)
+  municipio <- as.character(municipio)
+  
   if(nchar(estado) == 1){
     estado <- paste0("0", estado)
   }else{ 
