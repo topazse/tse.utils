@@ -18,10 +18,17 @@ t_desagreg_ageb <- function(v_marg,
   if(version == "crimen_v1"){
     # Modelo de desagregacion por crimen. 
     ### Usando modelo de Medellin, Mendoza (UANL): http://eprints.uanl.mx/3950/1/1080253615.pdf
+    ### Para evitar nulos pongo promedio del pais.
     marginacion <- ifelse(v_marg == "Alto",0.049, ifelse(v_marg=="Medio", 0.033, 0))
-    r <- v_derechs*(-0.064)+v_relhm*(-0.0001)+v_edadmed*(-0.002)+v_graproes*(-0.008)+v_hjf*(-0.279)+marginacion
+    r <- ifelse(is.na(v_derechs), 0.7122, v_derechs)*(-0.064)+
+          ifelse(is.na(v_relhm), 1.011, v_relhm)*(-0.0001)+
+           ifelse(is.na(v_edadmed), 26.9912, v_edadmed)*(-0.002)+
+            ifelse(is.na(v_graproes), 8.112, v_graproes)*(-0.008)+
+             ifelse(is.na(v_hjf), 0.3511, v_hjf)*(-0.279)+
+            marginacion
+    
     r <- abs(r)
-
+    
   }else{
     
   }
