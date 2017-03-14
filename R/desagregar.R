@@ -19,7 +19,7 @@ t_desagreg_ageb <- function(v_marg,
     # Modelo de desagregacion por crimen. 
     ### Usando modelo de Medellin, Mendoza (UANL): http://eprints.uanl.mx/3950/1/1080253615.pdf
     marginacion <- ifelse(v_marg == "Alto",0.049, ifelse(v_marg=="Medio", 0.033, 0))
-    r <- v_derechs*(-0.064)+v_relhm*(-0.0001)+v_edadmed*(-0.002)+v_graproes*(-0.008)+v_hjf(-0.279)+marginacion
+    r <- v_derechs*(-0.064)+v_relhm*(-0.0001)+v_edadmed*(-0.002)+v_graproes*(-0.008)+v_hjf*(-0.279)+marginacion
 
   }else{
     
