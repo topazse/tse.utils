@@ -175,3 +175,31 @@ t_llavegeo <- function(estado, municipio){
   llave <- paste0(estado, "-", municipio)
   return(llave)
 }
+#' Hacer nueva columna en base a catalogo
+#'
+#' Toma dos vectores: el primero es la columna que esta en la base de datos y el segundo es el nuevo, en el mismo orden de unique() de esa columna. 
+#' Ejemplo: unique(d$columna) es 1,5,2 y vector dos sería: c("uno","cinco","dos). Se puede poner tambien en otro orden, puesto que se junta con un left_join de dplyr.
+#' Returns un vector con las nuevas categorias en el orden de la base de datos.
+#' @param .data base de datos
+#' @param col vector de unicos de columna a catalogar
+#' @param v2 vector de nuevos nombres o categorias
+#' @export
+t_catalog <- function(.data, col, v2, verbose = TRUE){
+  .data <- as.data.frame(.data)
+  
+  if(col %in% colnames(.data)){ }else{ stop("Nombre de columna no esta en data") }
+  
+  v1 <- .data[, col]
+  v1 <- unique(v1)
+  
+  catalog <- data.frame("c1" = v1, 
+                        "c2" = v2)
+  
+  names(catalog) <- c(col, paste0(col,"_2"))
+  if(verbose){
+    print(head(catalog))
+    }
+  dn <- left_join(.data, catalog)
+  e <- dn[, paste0(col,"_2")]
+return(e)
+}
