@@ -41,3 +41,15 @@ t_i <- function(regex, ext, mismas=FALSE){
   }
 r
 }
+#' Agregar string de conexion a codigo INEGI
+#'
+#' Al pasar un codigo inegi, agrega lo necesario para conectar con inegiR
+#'
+#' @param codigo codigo de indicador (i.e. 251577)
+#'
+#' @export
+
+t_hacer_str_inegi <- function(codigo){
+  s <- paste0("http://www3.inegi.org.mx/sistemas/api/indicadores/v1//Indicador/", codigo, "/00000/en/false/xml/")
+  s
+}
