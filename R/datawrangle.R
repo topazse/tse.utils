@@ -216,6 +216,9 @@ t_imp_media <- function(x, todo = FALSE){
     replace(x, 
             is.na(x)| is.infinite(x) | is.nan(x), 
             mean(x, na.rm = TRUE))
+    mm <- x[!is.infinite(x)]
+    x <- ifelse(is.infinite(x), x, mm)
+    
     }else{
     replace(x, is.na(x), mean(x, na.rm = TRUE))
   }
