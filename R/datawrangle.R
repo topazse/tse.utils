@@ -206,9 +206,17 @@ return(e)
 #' Imputar la media en la columna
 #' 
 #' Si el valor es NA, se agrega la media de la columna. Esto se puede usar dentro de un summarise (dplyr).
+#' Si el parametro de todo = TRUE, entonces se cambian todos los valores infinitos y NaN's.
 #'
 #' @param x nombre de columna (bare si estas dentro de dplyr)
+#' @param todo si FALSE solo revisa NA's
 #' @export
-t_imp_media <- function(x){ 
-  replace(x, is.na(x), mean(x, na.rm = TRUE))
+t_imp_media <- function(x, todo = FALSE){ 
+  if(todo){
+    replace(x, 
+            is.na(x)| is.infinite(x) | is.nan(x), 
+            mean(x, na.rm = TRUE))
+    }else{
+    replace(x, is.na(x), mean(x, na.rm = TRUE))
+  }
 }
