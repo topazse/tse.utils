@@ -203,3 +203,12 @@ t_catalog <- function(.data, col, v2, verbose = TRUE){
   e <- dn[, paste0(col,"_2")]
 return(e)
 }
+#' Imputar la media en la columna
+#' 
+#' Si el valor es NA, se agrega la media de la columna. Esto se puede usar dentro de un summarise (dplyr).
+#'
+#' @param x nombre de columna (bare si estas dentro de dplyr)
+#' @export
+t_imp_media <- function(x){ 
+  replace(x, is.na(x), mean(x, na.rm = TRUE))
+}
