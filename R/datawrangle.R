@@ -211,16 +211,26 @@ return(e)
 #' @param x nombre de columna (bare si estas dentro de dplyr)
 #' @param todo si FALSE solo revisa NA's
 #' @export
-t_imp_media <- function(x, todo = FALSE){ 
+t_imp_media <- function(x, todo = FALSE, verbose = FALSE){ 
   if(todo){
-    replace(x, 
-            is.na(x)| is.infinite(x) | is.nan(x), 
-            mean(x, na.rm = TRUE))
     mm <- x[!is.infinite(x)]
-    x <- ifelse(is.infinite(x), x, mm)
+    mm <- mm[!is.nan(mm)]
+    mm <- mm[!is.na(mm)]
+    mm <- mean(mm)
+    
+    x <- ifelse(!is.infinite(x), x, mm)
+    x <- ifelse(!is.nan(x), x, mm)
+    x <- ifelse(!is.na(x), x, mm)
+    
     n <- x
-    }else{
-    n <- replace(x, is.na(x), mean(x, na.rm = TRUE))
+  }else{
+    mm <- mean(x, na.rm = TRUE)
+    n <- replace(x, is.na(x), mm)
+  }
+  # imprimo el resumen?
+  if(verbose){
+    t_printnum()
+    print(paste0("Valor imputado: ", t_rpintnum(mean(mm))))
   }
   n
 }
