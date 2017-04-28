@@ -100,3 +100,35 @@ t_modelo_empleos <- function(s_ind11, s_ind53, s_ind21, s_ind54,
   
   s
 }
+#' Modelo de Pesos de Crecimiento por Edad
+#' 
+#' Usado en el modulo de demografia en el modelo de expansion. 
+#' El objeto de df_conapo debe seguir mismo formato detallado en ese documento.
+#' @param df_conapo data.frame de conapo
+#' @export
+t_mod_edad_conapo <- function(df_conapo, version = 1){
+  if(version == 1){
+    pesos <- data.frame("RANGO_EDAD" = c("0-14", "15-29", "30-44", "45-64", "65+"), 
+                        "PESO" = c(2.155049, 3.708537,
+                                   2.155049, 1.200493, 
+                                   0.001998)) %>%
+      mutate("PESO_REL" = PESO/9.221126)
+    
+    d <- df_conapo %>% 
+      inner_join(., pesos) %>%
+      mutate("POBPOND" = PESO_REL*POB) %>%
+      group_by(Y, LLAVEGEO) %>% 
+      summarise("POB" = sum(POBPOND)) %>%
+      ungroup() %>%
+      group_by(LLAVEGEO) %>% 
+      arrange(Y) %>%
+      mutate("DELTA" =  diff(c(NA,POB)), 
+             "CREC_PORCENTUAL" = ((POB/lag(POB,1))-1)) %>% 
+      ungroup() %>%
+      dplyr::filter(Y != "2010") %>%
+      group_by(LLAVEGEO) %>%
+      summarise("C_TEORICO" = mean(CREC_PORCENTUAL))
+    
+    d
+  }
+}
