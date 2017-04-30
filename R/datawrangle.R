@@ -234,3 +234,79 @@ t_imp_media <- function(x, todo = FALSE, verbose = FALSE){
   }
   n
 }
+#' Promedio ponderado data.frame
+#' 
+#' Calcula un promedio ponderado de todo el data.frame o por grupos. Retorna numero o data.frame si tiene grupos.
+#'
+#' @param df data.frame 
+#' @param w columna (bare) de pesos (weights)
+#' @param v columna (bare) de valores
+#' @param g columna (bare) de grupos. Si se deja NULL, calcula un promedio sin grupos total.
+#' @export
+t_ppond_df <- function(df, w, v, g = NULL){
+  arguments <- as.list(match.call())
+  
+  y <- eval(arguments$w, df)
+  x <- eval(arguments$v, df)
+  gv <- eval(arguments$g, df)
+  
+  if(is.null(gv)){
+    d <- data.frame("yy" = y, 
+                    "xx" = x)
+    tt <- sum(d$yy)
+    
+    dff <- d %>%
+      mutate("sh" = yy/tt) %>% 
+      mutate("rr" = xx*sh)
+    
+    e <- sum(dff$rr)
+    
+  }else{
+    d <- data.frame("yy" = y, 
+                    "xx" = x, 
+                    "gg" = gv)
+    
+    dff <- d %>% 
+      left_join(., 
+                d %>% 
+                  group_by(gg) %>% 
+                  summarise("ss" = sum(yy))
+      ) %>% 
+      mutate("sh" = yy/ss) %>% 
+      mutate("rr" = xx*sh) %>%
+      ungroup() %>% 
+      group_by(gg) %>%
+      summarise("rr" = sum(rr))
+    dff <- as.data.frame(dff)
+    
+    names(dff)[1] <- list(paste0(as.character(arguments$g)))
+    names(dff)[2] <- list(paste0("PP_", as.character(arguments$v)))
+
+    e <- dff
+  }
+  e
+}
+#' Promedio ponderado 
+#' 
+#' Calcula un promedio ponderado de todo el por los grupos heredados en una cadena de dplyr.
+#' Se puede incluir en una llamada de summarise o mutate. Por ejemplo: df %>% group_by(grupo) %>% summarise("promediopond" = t_ppond(poblacion, ingreso))
+#' 
+#' @param w columna (bare) de pesos (weights)
+#' @param v columna (bare) de valores
+#' @export
+t_ppond <- function(w, v){
+  arguments <- as.list(match.call())
+  
+  y <- eval(arguments$w)
+  x <- eval(arguments$v)
+  
+    d <- data.frame("yy" = y, 
+                    "xx" = x)
+    tt <- sum(d$yy)
+    
+    dff <- d %>%
+      mutate("sh" = yy/tt) %>% 
+      mutate("rr" = xx*sh)
+    
+  sum(dff$rr)
+}
