@@ -300,6 +300,7 @@ t_zonificar_expansion <- function(d){
   df_n <- df_n %>% 
     left_join(., catalogo)
   # exp
+  df_n <- df_n %>% dplyr::ungroup()
   df_n
 }
 
