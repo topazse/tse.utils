@@ -282,12 +282,12 @@ t_zonificar_expansion <- function(d){
               "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
               "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
               "EST_MODELO" = sum(EST_MODELO),
-              "HH_COMP_GDE" = t_ppond(HH_COMP_GDE),
-              "HH_GENERAL" = t_ppond(HH_GENERAL), 
-              "SHR_PUB" = t_ppond(SHR_PUB), 
-              "SHR_GDE" = t_ppond(SHR_GDE), 
-              "SHR_MAYOR" = t_ppond(SHR_MAYOR),
-              "TEND_SHR_PUB" = t_ppond(TEND_SHR_PUB)
+              "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
+              "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
+              "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
+              "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
+              "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
+              "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB)
               )
     
   # solamente las columnas numericas...
