@@ -281,7 +281,13 @@ t_zonificar_expansion <- function(d){
               "EDAD_EDU_PROF" = sum(EDAD_EDU_PROF),
               "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
               "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
-              "EST_MODELO" = sum(EST_MODELO)
+              "EST_MODELO" = sum(EST_MODELO),
+              "HH_COMP_GDE" = t_ppond(HH_COMP_GDE),
+              "HH_GENERAL" = t_ppond(HH_GENERAL), 
+              "SHR_PUB" = t_ppond(SHR_PUB), 
+              "SHR_GDE" = t_ppond(SHR_GDE), 
+              "SHR_MAYOR" = t_ppond(SHR_MAYOR),
+              "TEND_SHR_PUB" = t_ppond(TEND_SHR_PUB)
               )
     
   # solamente las columnas numericas...
@@ -290,7 +296,7 @@ t_zonificar_expansion <- function(d){
   # el resto de columnas... 
   df_car <- dd[,!nums]
 
-  # escalamos todos los datos...
+  # escalamos todos los numericos...
   df_scale <- scale(df_nums)
   
   # unimos los datos
@@ -299,6 +305,7 @@ t_zonificar_expansion <- function(d){
   # unimos el catalogo
   df_n <- df_n %>% 
     left_join(., catalogo)
+  
   # exp
   df_n <- df_n %>% dplyr::ungroup()
   df_n
