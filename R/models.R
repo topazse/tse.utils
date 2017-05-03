@@ -156,7 +156,7 @@ t_zonificar_expansion <- function(d){
     dplyr::group_by(ZONA_TOPAZ_ID) %>% 
     dplyr::slice(1) %>% 
     dplyr::select(-p_pxc)
-    
+  
   clusters_xmun <- d %>%
     dplyr::select(c(LLAVEGEO, CLUSTER)) %>% 
     unique(.)
@@ -171,32 +171,36 @@ t_zonificar_expansion <- function(d){
     dplyr::select(-n) %>% 
     unique(.)
   
-    
+  
   # hacemos un catalogo, para poner al final 
   catalogo <- llave_cluster %>% 
     left_join(., llave_mun) %>%
     left_join(., clusters_xmun) %>% 
     left_join(., mini_mercados) %>%
     left_join(., nombres_zonas)
-    
+  
   ### Quitamos los NA's, reemplazando por el promedio
   da <- d %>% mutate_if(is.numeric, function(x){t_imp_media(x, todo = TRUE)})
   
-  # calculamos promedios ponderados
-  
+  # calculamos y resumimos
   dd <- da %>% 
-    group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
-    summarise("CERCANIA" = t_ppond(POBLACION, CERCANIA)/100000,
+    # columnas nuevas de diferencias absolutas
+    mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
+           "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
+           "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
+    dplyr::select(-AM_EDOCIVIL) %>%
+    # promedios ponderados
+    dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
+    dplyr::summarise("CERCANIA" = t_ppond(POBLACION, CERCANIA)/100000,
               "CENTRALIDAD_PODER" = t_ppond(POBLACION, CENTRALIDAD_PODER),
               "CERCANIA_PROM" = t_ppond(POBLACION, CERCANIA_PROM),
               "CERCANIA_REL" = t_ppond(POBLACION, CERCANIA_REL)/100000,
               "N2" = t_ppond(POBLACION, N2),
               "N3" = t_ppond(POBLACION, N3),
               "ES_SOLO" = t_ppond(POBLACION, ES_SOLO),
-              "AM_GRAPROES" = t_ppond(POBLACION, AM_GRAPROES),
-              "AM_PERSXHOGAR" = t_ppond(POBLACION, AM_PERSXHOGAR),
-              "AM_AUTOS" = t_ppond(POBLACION, AM_AUTOS),
-              "AM_EDOCIVIL" = t_ppond(POBLACION, AM_EDOCIVIL),
+              "DIF_GRAPOES" = t_ppond(POBLACION, DIF_GRAPOES), 
+              "DIF_PERSXHOGAR" = t_ppond(POBLACION, DIF_PERSXHOGAR), 
+              "DIF_AUTOS" = t_ppond(POBLACION, DIF_AUTOS),
               "TASA_EST" = t_ppond(POBLACION, TASA_EST),
               "CRIMENES" = t_ppond(POBLACION, CRIMENES),
               "TENDENCIA" = t_ppond(POBLACION, TENDENCIA),
@@ -275,27 +279,27 @@ t_zonificar_expansion <- function(d){
               "C_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, C_MANUFACTURAS_Y_PROCESOS),
               "C_NEGOCIOS" = t_ppond(POBLACION, C_NEGOCIOS),
               "C_SALUD" = t_ppond(POBLACION, C_SALUD), 
+              "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
+              "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
+              "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
+              "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
+              "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
+              "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB),
               #### fin de los promedios ponderados, ahora las sumas... 
               "POBLACION" = sum(POBLACION),
               "EDAD_EDU" = sum(EDAD_EDU),
               "EDAD_EDU_PROF" = sum(EDAD_EDU_PROF),
               "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
               "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
-              "EST_MODELO" = sum(EST_MODELO),
-              "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
-              "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
-              "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
-              "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
-              "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
-              "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB)
-              )
-    
+              "EST_MODELO" = sum(EST_MODELO)
+    )
+  
   # solamente las columnas numericas...
   nums <- sapply(dd, is.numeric)
   df_nums <- dd[, nums]
   # el resto de columnas... 
   df_car <- dd[,!nums]
-
+  
   # escalamos todos los numericos...
   df_scale <- scale(df_nums)
   
@@ -310,4 +314,3 @@ t_zonificar_expansion <- function(d){
   df_n <- df_n %>% dplyr::ungroup()
   df_n
 }
-
