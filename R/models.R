@@ -303,6 +303,9 @@ t_zonificar_expansion <- function(d){
   # escalamos todos los numericos...
   df_scale <- scale(df_nums)
   
+  # quitamos NaN's (Cuando no hay varianza)
+  df_scale[is.nan(df_scale)] <- 0
+  
   # unimos los datos
   df_n <- cbind.data.frame(df_car, df_scale)
   
