@@ -315,5 +315,10 @@ t_zonificar_expansion <- function(d){
   
   # exp
   df_n <- df_n %>% dplyr::ungroup()
-  df_n
+  df_r <- dd %>% dplyr::ungroup() %>% left_join(., catalogo)
+  
+  # lista, para exportar ambos
+  l <- list("escalados" = df_n,
+            "resumidos" = df_r)
+  l
 }
