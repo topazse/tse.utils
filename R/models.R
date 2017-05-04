@@ -185,7 +185,7 @@ t_zonificar_expansion <- function(d){
   # calculamos y resumimos
   dd <- da %>% 
     # columnas nuevas de diferencias absolutas
-    mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
+    dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
            "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
            "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
     dplyr::select(-AM_EDOCIVIL) %>%
@@ -292,7 +292,11 @@ t_zonificar_expansion <- function(d){
               "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
               "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
               "EST_MODELO" = sum(EST_MODELO)
-    )
+    ) 
+  
+  # algunos pisos y techos 
+  dd <- dd %>% 
+    dplyr::mutate("ESCOLARIDAD" = ifelse(ESCOLARIDAD>0.125, 0, ESCOLARIDAD))
   
   # solamente las columnas numericas...
   nums <- sapply(dd, is.numeric)
