@@ -136,193 +136,424 @@ t_mod_edad_conapo <- function(df_conapo, version = 1){
 #' 
 #' Toma un data.frame obtenido mediante t_datos_modelo (ver tse.sql) y retorna uno agrupado por zonas, de acuerdo a las reglas de agrupacion. 
 #' @param d data.frame
+#' @param porCluster si TRUE, escala los datos por cluster en el que esta la zona. Si FALSE, escala en total.
 #' @export
-t_zonificar_expansion <- function(d){
-  # primero, obtener llavegeos unicas y ageb-clusters unicos
-  llave_mun <- d %>% 
-    dplyr::group_by(ZONA_TOPAZ_ID, LLAVEGEO) %>% 
-    dplyr::summarise("p_pxmun" = sum(POBLACION)) %>% 
-    dplyr::arrange(-p_pxmun) %>% 
-    dplyr::ungroup() %>% 
-    dplyr::group_by(ZONA_TOPAZ_ID) %>% 
-    dplyr::slice(1) %>% 
-    dplyr::select(-p_pxmun)
+t_zonificar_expansion <- function(d, porCluster = FALSE){
+  if(porCluster){
+    
+    # primero, tengo que asignarle un solo cluster a cada zona (aun y cuando comparta...)
+    
+    realcluster <- d %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID, CLUSTER_ID) %>% 
+      dplyr::summarise("P" = sum(POBLACION)) %>% 
+      dplyr::arrange(-P) %>% 
+      dplyr::slice(1) %>%
+      dplyr::ungroup() %>% 
+      dplyr::select(-P)
+    
+    names(realcluster)[2] <- "REAL_CLUSTER_ID"
+    
+    d %<>% left_join(., realcluster)
+    
+    #### --------
+    #### empezamos a filtrar, ya sabemos que solamente hay un cluster por cada zona, 
+    #### basado en donde tiene mas poblacion. 
+    #### --------
+    
+    # la lista de los clusters
+    ccs <- unique(d[, 'REAL_CLUSTER_ID'])
+    
+    # data frame de escalados total (cada loop genera un df_n, que se rbind con este)
+    df_nn <- NULL
+    
+    # data frame de datos resumidos total (cada loop genera un df_n, que se rbind con este)
+    df_rr <- NULL
+    
+    # empezamos el loop, filtrando por cada Cluster ID 
+    for(i in 1:length(ccs)){
+      dtmp <- d %>% dplyr::filter(REAL_CLUSTER_ID == ccs[i])
+      
+      # para catalogos... 
+      llave_mun <- dtmp %>% 
+        dplyr::group_by(ZONA_TOPAZ_ID, LLAVEGEO) %>% 
+        dplyr::summarise("p_pxmun" = sum(POBLACION)) %>% 
+        dplyr::arrange(-p_pxmun) %>% 
+        dplyr::ungroup() %>% 
+        dplyr::group_by(ZONA_TOPAZ_ID) %>% 
+        dplyr::slice(1) %>% 
+        dplyr::select(-p_pxmun)
+      
+      llave_cluster <- dtmp %>% 
+        dplyr::group_by(ZONA_TOPAZ_ID, CLUSTER_AGEB) %>% 
+        dplyr::summarise("p_pxc" = sum(POBLACION)) %>% 
+        dplyr::arrange(-p_pxc) %>% 
+        dplyr::ungroup() %>% 
+        dplyr::group_by(ZONA_TOPAZ_ID) %>% 
+        dplyr::slice(1) %>% 
+        dplyr::select(-p_pxc)
+      
+      clusters_xmun <- dtmp %>%
+        dplyr::select(c(LLAVEGEO, CLUSTER)) %>% 
+        unique(.)
+      
+      mini_mercados <- dtmp %>% 
+        dplyr::group_by(CLUSTER_AGEB) %>% 
+        dplyr::summarise("POBMERCADO" = sum(POBLACION))
+      
+      nombres_zonas <- dtmp %>% 
+        dplyr::group_by(ZONA_TOPAZ_ID, ZONA) %>%
+        dplyr::summarise("n" = n()) %>% 
+        dplyr::select(-n) %>% 
+        unique(.)
+      
+      catalogo <- llave_cluster %>% 
+        left_join(., llave_mun) %>%
+        left_join(., clusters_xmun) %>% 
+        left_join(., mini_mercados) %>%
+        left_join(., nombres_zonas)
+      
+      ### Quitamos los NA's, reemplazando por el promedio
+      da <- dtmp %>% mutate_if(is.numeric, function(x){t_imp_media(x, todo = TRUE)})  
+      
+      # calculamos y resumimos
+      dd <- da %>% 
+        # columnas nuevas de diferencias absolutas
+        dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
+                      "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
+                      "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
+        dplyr::select(-AM_EDOCIVIL) %>%
+        # promedios ponderados
+        dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
+        dplyr::summarise("CERCANIA" = t_ppond(POBLACION, CERCANIA)/100000,
+                         "CENTRALIDAD_PODER" = t_ppond(POBLACION, CENTRALIDAD_PODER),
+                         "CERCANIA_PROM" = t_ppond(POBLACION, CERCANIA_PROM),
+                         "CERCANIA_REL" = t_ppond(POBLACION, CERCANIA_REL)/100000,
+                         "N2" = t_ppond(POBLACION, N2),
+                         "N3" = t_ppond(POBLACION, N3),
+                         "ES_SOLO" = t_ppond(POBLACION, ES_SOLO),
+                         "DIF_GRAPOES" = t_ppond(POBLACION, DIF_GRAPOES), 
+                         "DIF_PERSXHOGAR" = t_ppond(POBLACION, DIF_PERSXHOGAR), 
+                         "DIF_AUTOS" = t_ppond(POBLACION, DIF_AUTOS),
+                         "TASA_EST" = t_ppond(POBLACION, TASA_EST),
+                         "CRIMENES" = t_ppond(POBLACION, CRIMENES),
+                         "TENDENCIA" = t_ppond(POBLACION, TENDENCIA),
+                         "COB_NET_PRIM" = t_ppond(POBLACION, COB_NET_PRIM),
+                         "COB_NET_SEC" = t_ppond(POBLACION, COB_NET_SEC),
+                         "COB_NET_PREP" = t_ppond(POBLACION, COB_NET_PREP),
+                         "COB_NET_PROF" = t_ppond(POBLACION, COB_NET_PROF),
+                         "REZ_TOTAL_ADULTO" = t_ppond(POBLACION, REZ_TOTAL_ADULTO),
+                         "REZ_PREPA_ADULTO" = t_ppond(POBLACION, REZ_PREPA_ADULTO),
+                         "ESCOLARIDAD" = t_ppond(POBLACION, ESCOLARIDAD),
+                         "PEA" = t_ppond(POBLACION, PEA),
+                         "CATOLICOS" = t_ppond(POBLACION, CATOLICOS),
+                         "CENS_PERSXHOGAR" = t_ppond(POBLACION, CENS_PERSXHOGAR),
+                         "CENS_AUTO" = t_ppond(POBLACION, CENS_AUTO),
+                         "CENS_PC" = t_ppond(POBLACION, CENS_PC),
+                         "P_EDAD_EDU" = t_ppond(POBLACION, P_EDAD_EDU),
+                         "P_EDAD_EDU_PROF" = t_ppond(POBLACION, P_EDAD_EDU_PROF),
+                         "P_EDAD_EDUF_PREPA" = t_ppond(POBLACION, P_EDAD_EDUF_PREPA),
+                         "P_EDAD_EDUF_PROF" = t_ppond(POBLACION, P_EDAD_EDUF_PROF),
+                         "HACINAMIENTO" = t_ppond(POBLACION, HACINAMIENTO),
+                         "DENSIDAD" = t_ppond(POBLACION, DENSIDAD),
+                         "GEN_REZ_PREPA" = t_ppond(POBLACION, GEN_REZ_PREPA),
+                         "GEN_PART_PEA" = t_ppond(POBLACION, GEN_PART_PEA),
+                         "MIGRACION" = t_ppond(POBLACION, MIGRACION),
+                         "C_TEORICO" = t_ppond(POBLACION, C_TEORICO),
+                         "C_PROM" = t_ppond(POBLACION, C_PROM),
+                         "HH_UE_2014" = t_ppond(POBLACION, HH_UE_2014),
+                         "LQ_EMP_2014_11" = t_ppond(POBLACION, LQ_EMP_2014_11),
+                         "LQ_EMP_2014_21" = t_ppond(POBLACION, LQ_EMP_2014_21),
+                         "LQ_EMP_2014_22" = t_ppond(POBLACION, LQ_EMP_2014_22),
+                         "LQ_EMP_2014_23" = t_ppond(POBLACION, LQ_EMP_2014_23),
+                         "LQ_EMP_2014_43" = t_ppond(POBLACION, LQ_EMP_2014_43),
+                         "LQ_EMP_2014_46" = t_ppond(POBLACION, LQ_EMP_2014_46),
+                         "LQ_EMP_2014_51" = t_ppond(POBLACION, LQ_EMP_2014_51),
+                         "LQ_EMP_2014_52" = t_ppond(POBLACION, LQ_EMP_2014_52),
+                         "LQ_EMP_2014_53" = t_ppond(POBLACION, LQ_EMP_2014_53),
+                         "LQ_EMP_2014_54" = t_ppond(POBLACION, LQ_EMP_2014_54),
+                         "LQ_EMP_2014_55" = t_ppond(POBLACION, LQ_EMP_2014_55),
+                         "LQ_EMP_2014_56" = t_ppond(POBLACION, LQ_EMP_2014_56),
+                         "LQ_EMP_2014_61" = t_ppond(POBLACION, LQ_EMP_2014_61),
+                         "LQ_EMP_2014_62" = t_ppond(POBLACION, LQ_EMP_2014_62),
+                         "LQ_EMP_2014_71" = t_ppond(POBLACION, LQ_EMP_2014_71),
+                         "LQ_EMP_2014_72" = t_ppond(POBLACION, LQ_EMP_2014_72),
+                         "LQ_EMP_2014_81" = t_ppond(POBLACION, LQ_EMP_2014_81),
+                         "LQ_EMP_2014_SC" = t_ppond(POBLACION, LQ_EMP_2014_SC),
+                         "LQ_EMP_2014_OTROS" = t_ppond(POBLACION, LQ_EMP_2014_OTROS),
+                         "LQ_ING_2014_OTROS" = t_ppond(POBLACION, LQ_ING_2014_OTROS),
+                         "LQ_EMP_2014_PRIMARIA" = t_ppond(POBLACION, LQ_EMP_2014_PRIMARIA),
+                         "LQ_ING_2014_PRIMARIA" = t_ppond(POBLACION, LQ_ING_2014_PRIMARIA),
+                         "LQ_EMP_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_EMP_2014_SECUNDARIA),
+                         "LQ_ING_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_ING_2014_SECUNDARIA),
+                         "LQ_EMP_2014_TERCIARIA" = t_ppond(POBLACION, LQ_EMP_2014_TERCIARIA),
+                         "LQ_ING_2014_TERCIARIA" = t_ppond(POBLACION, LQ_ING_2014_TERCIARIA),
+                         "TMR_SEC" = t_ppond(POBLACION, TMR_SEC),
+                         "TMR_PREP" = t_ppond(POBLACION, TMR_PREP),
+                         "TMR_PROF" = t_ppond(POBLACION, TMR_PROF),
+                         "TA_PREP" = t_ppond(POBLACION, TA_PREP),
+                         "TA_PRO" = t_ppond(POBLACION, TA_PRO),
+                         "L_ADMINISTRACION" = t_ppond(POBLACION, L_ADMINISTRACION),
+                         "L_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, L_ARQUITECTURA_Y_CONSTRUCCION),
+                         "L_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, L_CIENCIAS_DE_LA_INFORMACION),
+                         "L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
+                         "L_DERECHO" = t_ppond(POBLACION, L_DERECHO),
+                         "L_HUMANIDADES" = t_ppond(POBLACION, L_HUMANIDADES),
+                         "L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
+                         "L_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, L_MANUFACTURAS_Y_PROCESOS),
+                         "L_NEGOCIOS" = t_ppond(POBLACION, L_NEGOCIOS),
+                         "L_SALUD" = t_ppond(POBLACION, L_SALUD),
+                         "C_ADMINISTRACION" = t_ppond(POBLACION, C_ADMINISTRACION),
+                         "C_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, C_ARQUITECTURA_Y_CONSTRUCCION),
+                         "C_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, C_CIENCIAS_DE_LA_INFORMACION),
+                         "C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
+                         "C_DERECHO" = t_ppond(POBLACION, C_DERECHO),
+                         "C_HUMANIDADES" = t_ppond(POBLACION, C_HUMANIDADES),
+                         "C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
+                         "C_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, C_MANUFACTURAS_Y_PROCESOS),
+                         "C_NEGOCIOS" = t_ppond(POBLACION, C_NEGOCIOS),
+                         "C_SALUD" = t_ppond(POBLACION, C_SALUD), 
+                         "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
+                         "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
+                         "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
+                         "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
+                         "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
+                         "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB),
+                         #### fin de los promedios ponderados, ahora las sumas... 
+                         "POBLACION" = sum(POBLACION),
+                         "EDAD_EDU" = sum(EDAD_EDU),
+                         "EDAD_EDU_PROF" = sum(EDAD_EDU_PROF),
+                         "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
+                         "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
+                         "EST_MODELO" = sum(EST_MODELO)
+        ) 
+      
+      # algunos pisos y techos 
+      dd <- dd %>% 
+        dplyr::mutate("ESCOLARIDAD" = ifelse(ESCOLARIDAD>0.125, 0, ESCOLARIDAD))  
+      
+      # solamente las columnas numericas...
+      nums <- sapply(dd, is.numeric)
+      df_nums <- dd[, nums]
+      # el resto de columnas... 
+      df_car <- dd[,!nums]  
+      
+      # escalamos todos los numericos...
+      df_scale <- scale(df_nums)
+      
+      # quitamos NaN's (Cuando no hay varianza)
+      df_scale[is.nan(df_scale)] <- 0
+      
+      # unimos los datos
+      df_n <- cbind.data.frame(df_car, df_scale)
+      
+      # unimos el catalogo
+      df_n <- df_n %>% 
+        left_join(., catalogo)
+      
+      # exp
+      df_n <- df_n %>% dplyr::ungroup()
+      df_r <- dd %>% dplyr::ungroup() %>% left_join(., catalogo)
+      
+      # unir al grande... 
+      df_nn <- rbind.data.frame(df_n, df_nn)
+      df_rr <- rbind.data.frame(df_r, df_rr)
+    } # fin del loop
+    
+    # lista, para exportar ambos
+    l <- list("escalados" = df_nn,
+              "resumidos" = df_rr)
+    
+  }else{
+    # aqui **no** es por cluster (entonces, hacemos todo de un jalon...)
+    # primero, obtener llavegeos unicas y ageb-clusters unicos
+    llave_mun <- d %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID, LLAVEGEO) %>% 
+      dplyr::summarise("p_pxmun" = sum(POBLACION)) %>% 
+      dplyr::arrange(-p_pxmun) %>% 
+      dplyr::ungroup() %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID) %>% 
+      dplyr::slice(1) %>% 
+      dplyr::select(-p_pxmun)
+    
+    llave_cluster <- d %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID, CLUSTER_AGEB) %>% 
+      dplyr::summarise("p_pxc" = sum(POBLACION)) %>% 
+      dplyr::arrange(-p_pxc) %>% 
+      dplyr::ungroup() %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID) %>% 
+      dplyr::slice(1) %>% 
+      dplyr::select(-p_pxc)
+    
+    clusters_xmun <- d %>%
+      dplyr::select(c(LLAVEGEO, CLUSTER)) %>% 
+      unique(.)
+    
+    mini_mercados <- d %>% 
+      dplyr::group_by(CLUSTER_AGEB) %>% 
+      dplyr::summarise("POBMERCADO" = sum(POBLACION))
+    
+    nombres_zonas <- d %>% 
+      dplyr::group_by(ZONA_TOPAZ_ID, ZONA) %>%
+      dplyr::summarise("n" = n()) %>% 
+      dplyr::select(-n) %>% 
+      unique(.)
+    
+    
+    # hacemos un catalogo, para poner al final 
+    catalogo <- llave_cluster %>% 
+      left_join(., llave_mun) %>%
+      left_join(., clusters_xmun) %>% 
+      left_join(., mini_mercados) %>%
+      left_join(., nombres_zonas)
+    
+    ### Quitamos los NA's, reemplazando por el promedio
+    da <- d %>% mutate_if(is.numeric, function(x){t_imp_media(x, todo = TRUE)})
+    
+    # calculamos y resumimos
+    dd <- da %>% 
+      # columnas nuevas de diferencias absolutas
+      dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
+                    "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
+                    "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
+      dplyr::select(-AM_EDOCIVIL) %>%
+      # promedios ponderados
+      dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
+      dplyr::summarise("CERCANIA" = t_ppond(POBLACION, CERCANIA)/100000,
+                       "CENTRALIDAD_PODER" = t_ppond(POBLACION, CENTRALIDAD_PODER),
+                       "CERCANIA_PROM" = t_ppond(POBLACION, CERCANIA_PROM),
+                       "CERCANIA_REL" = t_ppond(POBLACION, CERCANIA_REL)/100000,
+                       "N2" = t_ppond(POBLACION, N2),
+                       "N3" = t_ppond(POBLACION, N3),
+                       "ES_SOLO" = t_ppond(POBLACION, ES_SOLO),
+                       "DIF_GRAPOES" = t_ppond(POBLACION, DIF_GRAPOES), 
+                       "DIF_PERSXHOGAR" = t_ppond(POBLACION, DIF_PERSXHOGAR), 
+                       "DIF_AUTOS" = t_ppond(POBLACION, DIF_AUTOS),
+                       "TASA_EST" = t_ppond(POBLACION, TASA_EST),
+                       "CRIMENES" = t_ppond(POBLACION, CRIMENES),
+                       "TENDENCIA" = t_ppond(POBLACION, TENDENCIA),
+                       "COB_NET_PRIM" = t_ppond(POBLACION, COB_NET_PRIM),
+                       "COB_NET_SEC" = t_ppond(POBLACION, COB_NET_SEC),
+                       "COB_NET_PREP" = t_ppond(POBLACION, COB_NET_PREP),
+                       "COB_NET_PROF" = t_ppond(POBLACION, COB_NET_PROF),
+                       "REZ_TOTAL_ADULTO" = t_ppond(POBLACION, REZ_TOTAL_ADULTO),
+                       "REZ_PREPA_ADULTO" = t_ppond(POBLACION, REZ_PREPA_ADULTO),
+                       "ESCOLARIDAD" = t_ppond(POBLACION, ESCOLARIDAD),
+                       "PEA" = t_ppond(POBLACION, PEA),
+                       "CATOLICOS" = t_ppond(POBLACION, CATOLICOS),
+                       "CENS_PERSXHOGAR" = t_ppond(POBLACION, CENS_PERSXHOGAR),
+                       "CENS_AUTO" = t_ppond(POBLACION, CENS_AUTO),
+                       "CENS_PC" = t_ppond(POBLACION, CENS_PC),
+                       "P_EDAD_EDU" = t_ppond(POBLACION, P_EDAD_EDU),
+                       "P_EDAD_EDU_PROF" = t_ppond(POBLACION, P_EDAD_EDU_PROF),
+                       "P_EDAD_EDUF_PREPA" = t_ppond(POBLACION, P_EDAD_EDUF_PREPA),
+                       "P_EDAD_EDUF_PROF" = t_ppond(POBLACION, P_EDAD_EDUF_PROF),
+                       "HACINAMIENTO" = t_ppond(POBLACION, HACINAMIENTO),
+                       "DENSIDAD" = t_ppond(POBLACION, DENSIDAD),
+                       "GEN_REZ_PREPA" = t_ppond(POBLACION, GEN_REZ_PREPA),
+                       "GEN_PART_PEA" = t_ppond(POBLACION, GEN_PART_PEA),
+                       "MIGRACION" = t_ppond(POBLACION, MIGRACION),
+                       "C_TEORICO" = t_ppond(POBLACION, C_TEORICO),
+                       "C_PROM" = t_ppond(POBLACION, C_PROM),
+                       "HH_UE_2014" = t_ppond(POBLACION, HH_UE_2014),
+                       "LQ_EMP_2014_11" = t_ppond(POBLACION, LQ_EMP_2014_11),
+                       "LQ_EMP_2014_21" = t_ppond(POBLACION, LQ_EMP_2014_21),
+                       "LQ_EMP_2014_22" = t_ppond(POBLACION, LQ_EMP_2014_22),
+                       "LQ_EMP_2014_23" = t_ppond(POBLACION, LQ_EMP_2014_23),
+                       "LQ_EMP_2014_43" = t_ppond(POBLACION, LQ_EMP_2014_43),
+                       "LQ_EMP_2014_46" = t_ppond(POBLACION, LQ_EMP_2014_46),
+                       "LQ_EMP_2014_51" = t_ppond(POBLACION, LQ_EMP_2014_51),
+                       "LQ_EMP_2014_52" = t_ppond(POBLACION, LQ_EMP_2014_52),
+                       "LQ_EMP_2014_53" = t_ppond(POBLACION, LQ_EMP_2014_53),
+                       "LQ_EMP_2014_54" = t_ppond(POBLACION, LQ_EMP_2014_54),
+                       "LQ_EMP_2014_55" = t_ppond(POBLACION, LQ_EMP_2014_55),
+                       "LQ_EMP_2014_56" = t_ppond(POBLACION, LQ_EMP_2014_56),
+                       "LQ_EMP_2014_61" = t_ppond(POBLACION, LQ_EMP_2014_61),
+                       "LQ_EMP_2014_62" = t_ppond(POBLACION, LQ_EMP_2014_62),
+                       "LQ_EMP_2014_71" = t_ppond(POBLACION, LQ_EMP_2014_71),
+                       "LQ_EMP_2014_72" = t_ppond(POBLACION, LQ_EMP_2014_72),
+                       "LQ_EMP_2014_81" = t_ppond(POBLACION, LQ_EMP_2014_81),
+                       "LQ_EMP_2014_SC" = t_ppond(POBLACION, LQ_EMP_2014_SC),
+                       "LQ_EMP_2014_OTROS" = t_ppond(POBLACION, LQ_EMP_2014_OTROS),
+                       "LQ_ING_2014_OTROS" = t_ppond(POBLACION, LQ_ING_2014_OTROS),
+                       "LQ_EMP_2014_PRIMARIA" = t_ppond(POBLACION, LQ_EMP_2014_PRIMARIA),
+                       "LQ_ING_2014_PRIMARIA" = t_ppond(POBLACION, LQ_ING_2014_PRIMARIA),
+                       "LQ_EMP_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_EMP_2014_SECUNDARIA),
+                       "LQ_ING_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_ING_2014_SECUNDARIA),
+                       "LQ_EMP_2014_TERCIARIA" = t_ppond(POBLACION, LQ_EMP_2014_TERCIARIA),
+                       "LQ_ING_2014_TERCIARIA" = t_ppond(POBLACION, LQ_ING_2014_TERCIARIA),
+                       "TMR_SEC" = t_ppond(POBLACION, TMR_SEC),
+                       "TMR_PREP" = t_ppond(POBLACION, TMR_PREP),
+                       "TMR_PROF" = t_ppond(POBLACION, TMR_PROF),
+                       "TA_PREP" = t_ppond(POBLACION, TA_PREP),
+                       "TA_PRO" = t_ppond(POBLACION, TA_PRO),
+                       "L_ADMINISTRACION" = t_ppond(POBLACION, L_ADMINISTRACION),
+                       "L_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, L_ARQUITECTURA_Y_CONSTRUCCION),
+                       "L_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, L_CIENCIAS_DE_LA_INFORMACION),
+                       "L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
+                       "L_DERECHO" = t_ppond(POBLACION, L_DERECHO),
+                       "L_HUMANIDADES" = t_ppond(POBLACION, L_HUMANIDADES),
+                       "L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
+                       "L_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, L_MANUFACTURAS_Y_PROCESOS),
+                       "L_NEGOCIOS" = t_ppond(POBLACION, L_NEGOCIOS),
+                       "L_SALUD" = t_ppond(POBLACION, L_SALUD),
+                       "C_ADMINISTRACION" = t_ppond(POBLACION, C_ADMINISTRACION),
+                       "C_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, C_ARQUITECTURA_Y_CONSTRUCCION),
+                       "C_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, C_CIENCIAS_DE_LA_INFORMACION),
+                       "C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
+                       "C_DERECHO" = t_ppond(POBLACION, C_DERECHO),
+                       "C_HUMANIDADES" = t_ppond(POBLACION, C_HUMANIDADES),
+                       "C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
+                       "C_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, C_MANUFACTURAS_Y_PROCESOS),
+                       "C_NEGOCIOS" = t_ppond(POBLACION, C_NEGOCIOS),
+                       "C_SALUD" = t_ppond(POBLACION, C_SALUD), 
+                       "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
+                       "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
+                       "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
+                       "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
+                       "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
+                       "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB),
+                       #### fin de los promedios ponderados, ahora las sumas... 
+                       "POBLACION" = sum(POBLACION),
+                       "EDAD_EDU" = sum(EDAD_EDU),
+                       "EDAD_EDU_PROF" = sum(EDAD_EDU_PROF),
+                       "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
+                       "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
+                       "EST_MODELO" = sum(EST_MODELO)
+      ) 
+    
+    # algunos pisos y techos 
+    dd <- dd %>% 
+      dplyr::mutate("ESCOLARIDAD" = ifelse(ESCOLARIDAD>0.125, 0, ESCOLARIDAD))
+    
+    # solamente las columnas numericas...
+    nums <- sapply(dd, is.numeric)
+    df_nums <- dd[, nums]
+    # el resto de columnas... 
+    df_car <- dd[,!nums]
+    
+    # escalamos todos los numericos...
+    df_scale <- scale(df_nums)
+    
+    # quitamos NaN's (Cuando no hay varianza)
+    df_scale[is.nan(df_scale)] <- 0
+    
+    # unimos los datos
+    df_n <- cbind.data.frame(df_car, df_scale)
+    
+    # unimos el catalogo
+    df_n <- df_n %>% 
+      left_join(., catalogo)
+    
+    # exp
+    df_n <- df_n %>% dplyr::ungroup()
+    df_r <- dd %>% dplyr::ungroup() %>% left_join(., catalogo)
+    
+    # lista, para exportar ambos
+    l <- list("escalados" = df_n,
+              "resumidos" = df_r)
+    
+  } # fin del else (no es por cluster)
   
-  llave_cluster <- d %>% 
-    dplyr::group_by(ZONA_TOPAZ_ID, CLUSTER_AGEB) %>% 
-    dplyr::summarise("p_pxc" = sum(POBLACION)) %>% 
-    dplyr::arrange(-p_pxc) %>% 
-    dplyr::ungroup() %>% 
-    dplyr::group_by(ZONA_TOPAZ_ID) %>% 
-    dplyr::slice(1) %>% 
-    dplyr::select(-p_pxc)
-  
-  clusters_xmun <- d %>%
-    dplyr::select(c(LLAVEGEO, CLUSTER)) %>% 
-    unique(.)
-  
-  mini_mercados <- d %>% 
-    dplyr::group_by(CLUSTER_AGEB) %>% 
-    dplyr::summarise("POBMERCADO" = sum(POBLACION))
-  
-  nombres_zonas <- d %>% 
-    dplyr::group_by(ZONA_TOPAZ_ID, ZONA) %>%
-    dplyr::summarise("n" = n()) %>% 
-    dplyr::select(-n) %>% 
-    unique(.)
-  
-  
-  # hacemos un catalogo, para poner al final 
-  catalogo <- llave_cluster %>% 
-    left_join(., llave_mun) %>%
-    left_join(., clusters_xmun) %>% 
-    left_join(., mini_mercados) %>%
-    left_join(., nombres_zonas)
-  
-  ### Quitamos los NA's, reemplazando por el promedio
-  da <- d %>% mutate_if(is.numeric, function(x){t_imp_media(x, todo = TRUE)})
-  
-  # calculamos y resumimos
-  dd <- da %>% 
-    # columnas nuevas de diferencias absolutas
-    dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
-           "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
-           "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
-    dplyr::select(-AM_EDOCIVIL) %>%
-    # promedios ponderados
-    dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
-    dplyr::summarise("CERCANIA" = t_ppond(POBLACION, CERCANIA)/100000,
-              "CENTRALIDAD_PODER" = t_ppond(POBLACION, CENTRALIDAD_PODER),
-              "CERCANIA_PROM" = t_ppond(POBLACION, CERCANIA_PROM),
-              "CERCANIA_REL" = t_ppond(POBLACION, CERCANIA_REL)/100000,
-              "N2" = t_ppond(POBLACION, N2),
-              "N3" = t_ppond(POBLACION, N3),
-              "ES_SOLO" = t_ppond(POBLACION, ES_SOLO),
-              "DIF_GRAPOES" = t_ppond(POBLACION, DIF_GRAPOES), 
-              "DIF_PERSXHOGAR" = t_ppond(POBLACION, DIF_PERSXHOGAR), 
-              "DIF_AUTOS" = t_ppond(POBLACION, DIF_AUTOS),
-              "TASA_EST" = t_ppond(POBLACION, TASA_EST),
-              "CRIMENES" = t_ppond(POBLACION, CRIMENES),
-              "TENDENCIA" = t_ppond(POBLACION, TENDENCIA),
-              "COB_NET_PRIM" = t_ppond(POBLACION, COB_NET_PRIM),
-              "COB_NET_SEC" = t_ppond(POBLACION, COB_NET_SEC),
-              "COB_NET_PREP" = t_ppond(POBLACION, COB_NET_PREP),
-              "COB_NET_PROF" = t_ppond(POBLACION, COB_NET_PROF),
-              "REZ_TOTAL_ADULTO" = t_ppond(POBLACION, REZ_TOTAL_ADULTO),
-              "REZ_PREPA_ADULTO" = t_ppond(POBLACION, REZ_PREPA_ADULTO),
-              "ESCOLARIDAD" = t_ppond(POBLACION, ESCOLARIDAD),
-              "PEA" = t_ppond(POBLACION, PEA),
-              "CATOLICOS" = t_ppond(POBLACION, CATOLICOS),
-              "CENS_PERSXHOGAR" = t_ppond(POBLACION, CENS_PERSXHOGAR),
-              "CENS_AUTO" = t_ppond(POBLACION, CENS_AUTO),
-              "CENS_PC" = t_ppond(POBLACION, CENS_PC),
-              "P_EDAD_EDU" = t_ppond(POBLACION, P_EDAD_EDU),
-              "P_EDAD_EDU_PROF" = t_ppond(POBLACION, P_EDAD_EDU_PROF),
-              "P_EDAD_EDUF_PREPA" = t_ppond(POBLACION, P_EDAD_EDUF_PREPA),
-              "P_EDAD_EDUF_PROF" = t_ppond(POBLACION, P_EDAD_EDUF_PROF),
-              "HACINAMIENTO" = t_ppond(POBLACION, HACINAMIENTO),
-              "DENSIDAD" = t_ppond(POBLACION, DENSIDAD),
-              "GEN_REZ_PREPA" = t_ppond(POBLACION, GEN_REZ_PREPA),
-              "GEN_PART_PEA" = t_ppond(POBLACION, GEN_PART_PEA),
-              "MIGRACION" = t_ppond(POBLACION, MIGRACION),
-              "C_TEORICO" = t_ppond(POBLACION, C_TEORICO),
-              "C_PROM" = t_ppond(POBLACION, C_PROM),
-              "HH_UE_2014" = t_ppond(POBLACION, HH_UE_2014),
-              "LQ_EMP_2014_11" = t_ppond(POBLACION, LQ_EMP_2014_11),
-              "LQ_EMP_2014_21" = t_ppond(POBLACION, LQ_EMP_2014_21),
-              "LQ_EMP_2014_22" = t_ppond(POBLACION, LQ_EMP_2014_22),
-              "LQ_EMP_2014_23" = t_ppond(POBLACION, LQ_EMP_2014_23),
-              "LQ_EMP_2014_43" = t_ppond(POBLACION, LQ_EMP_2014_43),
-              "LQ_EMP_2014_46" = t_ppond(POBLACION, LQ_EMP_2014_46),
-              "LQ_EMP_2014_51" = t_ppond(POBLACION, LQ_EMP_2014_51),
-              "LQ_EMP_2014_52" = t_ppond(POBLACION, LQ_EMP_2014_52),
-              "LQ_EMP_2014_53" = t_ppond(POBLACION, LQ_EMP_2014_53),
-              "LQ_EMP_2014_54" = t_ppond(POBLACION, LQ_EMP_2014_54),
-              "LQ_EMP_2014_55" = t_ppond(POBLACION, LQ_EMP_2014_55),
-              "LQ_EMP_2014_56" = t_ppond(POBLACION, LQ_EMP_2014_56),
-              "LQ_EMP_2014_61" = t_ppond(POBLACION, LQ_EMP_2014_61),
-              "LQ_EMP_2014_62" = t_ppond(POBLACION, LQ_EMP_2014_62),
-              "LQ_EMP_2014_71" = t_ppond(POBLACION, LQ_EMP_2014_71),
-              "LQ_EMP_2014_72" = t_ppond(POBLACION, LQ_EMP_2014_72),
-              "LQ_EMP_2014_81" = t_ppond(POBLACION, LQ_EMP_2014_81),
-              "LQ_EMP_2014_SC" = t_ppond(POBLACION, LQ_EMP_2014_SC),
-              "LQ_EMP_2014_OTROS" = t_ppond(POBLACION, LQ_EMP_2014_OTROS),
-              "LQ_ING_2014_OTROS" = t_ppond(POBLACION, LQ_ING_2014_OTROS),
-              "LQ_EMP_2014_PRIMARIA" = t_ppond(POBLACION, LQ_EMP_2014_PRIMARIA),
-              "LQ_ING_2014_PRIMARIA" = t_ppond(POBLACION, LQ_ING_2014_PRIMARIA),
-              "LQ_EMP_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_EMP_2014_SECUNDARIA),
-              "LQ_ING_2014_SECUNDARIA" = t_ppond(POBLACION, LQ_ING_2014_SECUNDARIA),
-              "LQ_EMP_2014_TERCIARIA" = t_ppond(POBLACION, LQ_EMP_2014_TERCIARIA),
-              "LQ_ING_2014_TERCIARIA" = t_ppond(POBLACION, LQ_ING_2014_TERCIARIA),
-              "TMR_SEC" = t_ppond(POBLACION, TMR_SEC),
-              "TMR_PREP" = t_ppond(POBLACION, TMR_PREP),
-              "TMR_PROF" = t_ppond(POBLACION, TMR_PROF),
-              "TA_PREP" = t_ppond(POBLACION, TA_PREP),
-              "TA_PRO" = t_ppond(POBLACION, TA_PRO),
-              "L_ADMINISTRACION" = t_ppond(POBLACION, L_ADMINISTRACION),
-              "L_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, L_ARQUITECTURA_Y_CONSTRUCCION),
-              "L_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, L_CIENCIAS_DE_LA_INFORMACION),
-              "L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, L_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
-              "L_DERECHO" = t_ppond(POBLACION, L_DERECHO),
-              "L_HUMANIDADES" = t_ppond(POBLACION, L_HUMANIDADES),
-              "L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, L_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
-              "L_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, L_MANUFACTURAS_Y_PROCESOS),
-              "L_NEGOCIOS" = t_ppond(POBLACION, L_NEGOCIOS),
-              "L_SALUD" = t_ppond(POBLACION, L_SALUD),
-              "C_ADMINISTRACION" = t_ppond(POBLACION, C_ADMINISTRACION),
-              "C_ARQUITECTURA_Y_CONSTRUCCION" = t_ppond(POBLACION, C_ARQUITECTURA_Y_CONSTRUCCION),
-              "C_CIENCIAS_DE_LA_INFORMACION" = t_ppond(POBLACION, C_CIENCIAS_DE_LA_INFORMACION),
-              "C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO" = t_ppond(POBLACION, C_CIENCIAS_SOCIALES_Y_ESTUDIOS_DEL_COMPORTAMIENTO),
-              "C_DERECHO" = t_ppond(POBLACION, C_DERECHO),
-              "C_HUMANIDADES" = t_ppond(POBLACION, C_HUMANIDADES),
-              "C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA" = t_ppond(POBLACION, C_INGENIERIA_INDUSTRIAL__MECANICA_Y_ELECTRICA),
-              "C_MANUFACTURAS_Y_PROCESOS" = t_ppond(POBLACION, C_MANUFACTURAS_Y_PROCESOS),
-              "C_NEGOCIOS" = t_ppond(POBLACION, C_NEGOCIOS),
-              "C_SALUD" = t_ppond(POBLACION, C_SALUD), 
-              "HH_COMP_GDE" = t_ppond(POBLACION, HH_COMP_GDE),
-              "HH_GENERAL" = t_ppond(POBLACION, HH_GENERAL), 
-              "SHR_PUB" = t_ppond(POBLACION, SHR_PUB), 
-              "SHR_GDE" = t_ppond(POBLACION, SHR_GDE), 
-              "SHR_MAYOR" = t_ppond(POBLACION, SHR_MAYOR),
-              "TEND_SHR_PUB" = t_ppond(POBLACION, TEND_SHR_PUB),
-              #### fin de los promedios ponderados, ahora las sumas... 
-              "POBLACION" = sum(POBLACION),
-              "EDAD_EDU" = sum(EDAD_EDU),
-              "EDAD_EDU_PROF" = sum(EDAD_EDU_PROF),
-              "EDAD_EDUF_PREPA" = sum(EDAD_EDUF_PREPA),
-              "EDAD_EDUF_PROF" = sum(EDAD_EDUF_PROF),
-              "EST_MODELO" = sum(EST_MODELO)
-    ) 
-  
-  # algunos pisos y techos 
-  dd <- dd %>% 
-    dplyr::mutate("ESCOLARIDAD" = ifelse(ESCOLARIDAD>0.125, 0, ESCOLARIDAD))
-  
-  # solamente las columnas numericas...
-  nums <- sapply(dd, is.numeric)
-  df_nums <- dd[, nums]
-  # el resto de columnas... 
-  df_car <- dd[,!nums]
-  
-  # escalamos todos los numericos...
-  df_scale <- scale(df_nums)
-  
-  # quitamos NaN's (Cuando no hay varianza)
-  df_scale[is.nan(df_scale)] <- 0
-  
-  # unimos los datos
-  df_n <- cbind.data.frame(df_car, df_scale)
-  
-  # unimos el catalogo
-  df_n <- df_n %>% 
-    left_join(., catalogo)
-  
-  # exp
-  df_n <- df_n %>% dplyr::ungroup()
-  df_r <- dd %>% dplyr::ungroup() %>% left_join(., catalogo)
-  
-  # lista, para exportar ambos
-  l <- list("escalados" = df_n,
-            "resumidos" = df_r)
+  # fin de todo. exportar l
   l
 }
