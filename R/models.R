@@ -218,9 +218,9 @@ t_zonificar_expansion <- function(d, porCluster = FALSE){
       # calculamos y resumimos
       dd <- da %>% 
         # columnas nuevas de diferencias absolutas
-        dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
-                      "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
-                      "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
+        dplyr::mutate("DIF_GRAPOES" = 1/(abs(AM_GRAPROES-ESCOLARIDAD)^2), 
+                      "DIF_PERSXHOGAR" = 1/(abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2), 
+                      "DIF_AUTOS" = 1/(abs(AM_AUTOS-CENS_AUTO)^2)) %>% 
         dplyr::select(-AM_EDOCIVIL) %>%
         # promedios ponderados
         dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
@@ -412,9 +412,9 @@ t_zonificar_expansion <- function(d, porCluster = FALSE){
     # calculamos y resumimos
     dd <- da %>% 
       # columnas nuevas de diferencias absolutas
-      dplyr::mutate("DIF_GRAPOES" = abs(AM_GRAPROES-ESCOLARIDAD)^2, 
-                    "DIF_PERSXHOGAR" = abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2, 
-                    "DIF_AUTOS" = abs(AM_AUTOS-CENS_AUTO)^2) %>% 
+      dplyr::mutate("DIF_GRAPOES" = 1/(abs(AM_GRAPROES-ESCOLARIDAD)^2), 
+                    "DIF_PERSXHOGAR" = 1/(abs(AM_PERSXHOGAR-CENS_PERSXHOGAR)^2), 
+                    "DIF_AUTOS" = 1/(abs(AM_AUTOS-CENS_AUTO)^2)) %>% 
       dplyr::select(-AM_EDOCIVIL) %>%
       # promedios ponderados
       dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID) %>% 
@@ -556,4 +556,56 @@ t_zonificar_expansion <- function(d, porCluster = FALSE){
   
   # fin de todo. exportar l
   l
+}
+#' Modelo de Expansion
+#'
+#' @param d data.frame "ancho" con variables que sean las mismas que pesos. Ver ejemplos en shiny.
+#' @param w data.frame con ponderaciones por cada variable (se va unir con d)
+#' @param tipo tipo de modelo, por lo pronto solamente por "puntos"
+#' @param exportar exportar score general o subindices
+#' @export
+t_modeloexpansion <- function(d, w, tipo = "puntos", general = TRUE){
+  ###########################################################
+  # las columnas que estan en d, deben estar en el archivo de excel (VariableDef o Diccionario)
+  # ojo: si se agregan o quitan columnas, debe de cambiarse tambien aqui
+  #
+  ###########################################################
+  # Tipos de modelos
+  # 1- Por puntos usa un sistema de asignacion de puntos por cada lugar en la distribucion y cada 
+  # indicador. Por ejemplo, el indicador x se divide en escala z. Este peso se multiplica por el peso de la variable.
+  # Es un "modelo" muy facil de entender.
+  ###########################################################
+  # ++++++++++++++++++++++ MODELO 1 (puntos)
+  ###########################################################
+  if(tipo == "puntos"){
+    wdf <- d %>%  # primero, hacemos largo el d
+      reshape2::melt(id.vars = c("MACRO_ZONA", "ZONA_AGRUPADA", 
+                                 "ZONA_TOPAZ_ID", "CLUSTER_AGEB", 
+                                 "LLAVEGEO", "CLUSTER", "ZONA")) %>% 
+      dplyr::left_join(., w) %>%  # unimos con w
+      dplyr::mutate("SCORE" = value*peso)  #obtenemos los pesos por simple multiplicacion
+    
+    if(general){
+      wdf <- wdf %>% 
+      dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID, 
+                      CLUSTER_AGEB, LLAVEGEO, CLUSTER, ZONA) %>%
+      dplyr::summarise("SCORE" = sum(SCORE)) # sumamos todos los indicadores
+    
+    wdf$SCORE <- as.vector(scale(x = wdf$SCORE)) # escalamos todos los scores
+    }else{
+      wdf <- wdf %>%
+      dplyr::group_by(MACRO_ZONA, ZONA_AGRUPADA, ZONA_TOPAZ_ID, 
+                      CLUSTER_AGEB, LLAVEGEO, CLUSTER, ZONA, sector) %>%
+      dplyr::summarise("SCORE" = sum(SCORE))
+    
+    wdf$SCORE <- as.vector(scale(x = wdf$SCORE))
+    } # fin de else de general... 
+    
+  }else{
+    if(tipo == "arboles"){
+      # hacer si hay suficientes datos! 
+    }else{stop("Seleccionar solamente arboles o puntos como tipo de modelo")}
+  }
+  # exportar 
+  wdf
 }
