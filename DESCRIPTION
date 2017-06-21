@@ -6,6 +6,14 @@ Author: Eduardo Flores
 Maintainer: Eduardo Flores <efl@topaz.mx>
 Description: Funciones utiles para datos en Topaz Soluciones Educativas
 License: CCO
+Imports:
+    dplyr,
+    inegiR,
+    ggplot2,
+    magrittr,
+    foreign,
+    memisc,
+    RODBC
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 5.0.1
