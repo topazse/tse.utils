@@ -300,8 +300,8 @@ t_ppond <- function(w, v){
   #y <- eval(arguments$w)
   #x <- eval(arguments$v)
   
-    d <- data.frame("yy" = y, 
-                    "xx" = x)
+    d <- data.frame("yy" = w, 
+                    "xx" = v)
     tt <- sum(d$yy)
     
     dff <- d %>%
