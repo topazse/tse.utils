@@ -295,10 +295,10 @@ t_ppond_df <- function(df, w, v, g = NULL){
 #' @param v columna (bare) de valores
 #' @export
 t_ppond <- function(w, v){
-  arguments <- as.list(match.call())
+  #arguments <- as.list(match.call())
   
-  y <- eval(arguments$w)
-  x <- eval(arguments$v)
+  #y <- eval(arguments$w)
+  #x <- eval(arguments$v)
   
     d <- data.frame("yy" = y, 
                     "xx" = x)
